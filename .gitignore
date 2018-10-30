@@ -54,6 +54,9 @@ _build/
 *.sct
 *.lnp
 
+# J-Link
+JLinkLog.txt
+
 # Kernel Module Compile Results
 *.mod*
 *.cmd
