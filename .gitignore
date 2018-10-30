@@ -53,6 +53,7 @@ _build/
 *.pack
 *.sct
 *.lnp
+*~
 
 # J-Link
 JLinkLog.txt

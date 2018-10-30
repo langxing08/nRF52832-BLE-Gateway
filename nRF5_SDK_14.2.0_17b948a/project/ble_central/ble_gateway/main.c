@@ -35,15 +35,9 @@
 
 #define NUS_SERVICE_UUID_TYPE   BLE_UUID_TYPE_VENDOR_BEGIN              /**< UUID type for the Nordic UART Service (vendor specific). */
 
-#define SCAN_INTERVAL           0x00A0                                  /**< Determines scan interval in units of 0.625 millisecond. */
-#define SCAN_WINDOW             0x0050                                  /**< Determines scan window in units of 0.625 millisecond. */
+#define SCAN_INTERVAL           MSEC_TO_UNITS(100, UNIT_0_625_MS)		/**< Determines scan interval in units of 0.625 millisecond. */
+#define SCAN_WINDOW             MSEC_TO_UNITS(50, UNIT_0_625_MS)		/**< Determines scan window in units of 0.625 millisecond. */
 #define SCAN_TIMEOUT            0x0000                                  /**< Timout when scanning. 0x0000 disables timeout. */
-
-#define UUID16_SIZE             2                                       /**< Size of 16 bit UUID */
-#define UUID32_SIZE             4                                       /**< Size of 32 bit UUID */
-#define UUID128_SIZE            16                                      /**< Size of 128 bit UUID */
-
-#define ECHOBACK_BLE_UART_DATA  1                                       /**< Echo the UART data that is received over the Nordic UART Service back to the sender. */
 
 
 BLE_NUS_C_DEF(m_ble_nus_c);                                             /**< BLE NUS service client instance. */
@@ -165,16 +159,16 @@ void uart_event_handle(app_uart_evt_t * p_event)
             }
             break;
 
-        /**@snippet [Handling data from UART] */
-        case APP_UART_COMMUNICATION_ERROR:
-            NRF_LOG_ERROR("Communication error occurred while handling UART.");
-            APP_ERROR_HANDLER(p_event->data.error_communication);
-            break;
+//        /**@snippet [Handling data from UART] */
+//        case APP_UART_COMMUNICATION_ERROR:
+//            NRF_LOG_ERROR("Communication error occurred while handling UART.");
+//            APP_ERROR_HANDLER(p_event->data.error_communication);
+//            break;
 
-        case APP_UART_FIFO_ERROR:
-            NRF_LOG_ERROR("Error occurred in FIFO module used by UART.");
-            APP_ERROR_HANDLER(p_event->data.error_code);
-            break;
+//        case APP_UART_FIFO_ERROR:
+//            NRF_LOG_ERROR("Error occurred in FIFO module used by UART.");
+//            APP_ERROR_HANDLER(p_event->data.error_code);
+//            break;
 
         default:
             break;
