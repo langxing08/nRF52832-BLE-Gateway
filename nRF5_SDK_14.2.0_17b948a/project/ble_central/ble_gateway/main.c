@@ -159,17 +159,6 @@ void uart_event_handle(app_uart_evt_t * p_event)
             }
             break;
 
-//        /**@snippet [Handling data from UART] */
-//        case APP_UART_COMMUNICATION_ERROR:
-//            NRF_LOG_ERROR("Communication error occurred while handling UART.");
-//            APP_ERROR_HANDLER(p_event->data.error_communication);
-//            break;
-
-//        case APP_UART_FIFO_ERROR:
-//            NRF_LOG_ERROR("Error occurred in FIFO module used by UART.");
-//            APP_ERROR_HANDLER(p_event->data.error_code);
-//            break;
-
         default:
             break;
     }
