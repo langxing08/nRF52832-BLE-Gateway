@@ -127,6 +127,22 @@ static void AT_cmd_handle(uint8_t *pBuffer, uint16_t length)
 	{
 		printf("AT+VER:%s,%s,%s\r\n", HARDWARE_NUMBER, FIRMWARE_NUMBER, SOFTWARE_NUMBER);	
 	}	
+
+	// MAC address check: AT+MAC?\r\n
+	else if((length == 9) && (strncmp((char*)pBuffer, "AT+MAC?\r\n", 9) == 0))//check MAC addr
+	{
+		ble_gap_addr_t device_addr;
+	
+		// Get BLE address.
+		#if (NRF_SD_BLE_API_VERSION >= 3)
+			err_code = sd_ble_gap_addr_get(&device_addr);
+		#else
+			err_code = sd_ble_gap_address_get(&device_addr);
+		#endif
+		APP_ERROR_CHECK(err_code);
+
+		printf("AT+MAC:%s\r\n", Util_convertBdAddr2Str(device_addr.addr));
+	}	
 }
 
 
