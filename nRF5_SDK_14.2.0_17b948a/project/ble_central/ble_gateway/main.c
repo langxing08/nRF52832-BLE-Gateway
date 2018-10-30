@@ -112,6 +112,12 @@ static void AT_cmd_handle(uint8_t *pBuffer, uint16_t length)
 	{
 		printf("AT:OK\r\n");
 	}
+	
+	// System soft reset: AT+RESET\r\n
+	else if((length == 10) && (strncmp((char*)pBuffer, "AT+RESET\r\n", 10) == 0))
+	{
+		NVIC_SystemReset();	// Restart the system by default	
+	}
 }
 
 
