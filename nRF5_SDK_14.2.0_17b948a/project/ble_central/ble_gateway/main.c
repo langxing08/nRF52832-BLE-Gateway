@@ -26,6 +26,9 @@
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 
+#define HARDWARE_NUMBER			"HW_4.3"
+#define SOFTWARE_NUMBER			"SW_1.0.3"
+#define FIRMWARE_NUMBER			"FW_14.2.0"
 
 #define APP_BLE_CONN_CFG_TAG    1                                       /**< A tag that refers to the BLE stack configuration we set with @ref sd_ble_cfg_set. Default tag is @ref BLE_CONN_CFG_TAG_DEFAULT. */
 #define APP_BLE_OBSERVER_PRIO   3                                       /**< Application's BLE observer priority. You shoulnd't need to modify this value. */
@@ -118,6 +121,12 @@ static void AT_cmd_handle(uint8_t *pBuffer, uint16_t length)
 	{
 		NVIC_SystemReset();	// Restart the system by default	
 	}
+	
+	// Hardware/firmware/software version check: AT+VER?\r\n
+	else if((length == 9) && (strncmp((char*)pBuffer, "AT+VER?\r\n", 9) == 0))
+	{
+		printf("AT+VER:%s,%s,%s\r\n", HARDWARE_NUMBER, FIRMWARE_NUMBER, SOFTWARE_NUMBER);	
+	}	
 }
 
 
