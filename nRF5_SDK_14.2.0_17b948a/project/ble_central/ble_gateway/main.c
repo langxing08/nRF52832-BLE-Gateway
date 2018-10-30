@@ -1,40 +1,4 @@
 /**
- * Copyright (c) 2016 - 2017, Nordic Semiconductor ASA
- * 
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- * 
- * 1. Redistributions of source code must retain the above copyright notice, this
- *    list of conditions and the following disclaimer.
- * 
- * 2. Redistributions in binary form, except as embedded into a Nordic
- *    Semiconductor ASA integrated circuit in a product or a software update for
- *    such product, must reproduce the above copyright notice, this list of
- *    conditions and the following disclaimer in the documentation and/or other
- *    materials provided with the distribution.
- * 
- * 3. Neither the name of Nordic Semiconductor ASA nor the names of its
- *    contributors may be used to endorse or promote products derived from this
- *    software without specific prior written permission.
- * 
- * 4. This software, with or without modification, must only be used with a
- *    Nordic Semiconductor ASA integrated circuit.
- * 
- * 5. Any software provided in binary form under this license must not be reverse
- *    engineered, decompiled, modified and/or disassembled.
- * 
- * THIS SOFTWARE IS PROVIDED BY NORDIC SEMICONDUCTOR ASA "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY, NONINFRINGEMENT, AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL NORDIC SEMICONDUCTOR ASA OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
- * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
  */
 #include <stdio.h>
@@ -75,11 +39,6 @@
 #define SCAN_WINDOW             0x0050                                  /**< Determines scan window in units of 0.625 millisecond. */
 #define SCAN_TIMEOUT            0x0000                                  /**< Timout when scanning. 0x0000 disables timeout. */
 
-#define MIN_CONNECTION_INTERVAL MSEC_TO_UNITS(20, UNIT_1_25_MS)         /**< Determines minimum connection interval in millisecond. */
-#define MAX_CONNECTION_INTERVAL MSEC_TO_UNITS(75, UNIT_1_25_MS)         /**< Determines maximum connection interval in millisecond. */
-#define SLAVE_LATENCY           0                                       /**< Determines slave latency in counts of connection events. */
-#define SUPERVISION_TIMEOUT     MSEC_TO_UNITS(4000, UNIT_10_MS)         /**< Determines supervision time-out in units of 10 millisecond. */
-
 #define UUID16_SIZE             2                                       /**< Size of 16 bit UUID */
 #define UUID32_SIZE             4                                       /**< Size of 32 bit UUID */
 #define UUID128_SIZE            16                                      /**< Size of 128 bit UUID */
@@ -109,6 +68,34 @@ static ble_gap_scan_params_t const m_scan_params =
         .use_whitelist = 0,
     #endif
 };
+
+
+/**@brief Function for convert Bluetooth MAC address to string.
+ *
+ * @param[in] *pAddr - Bluetooth MAC address.
+ * 
+ * @param[out] BD address as a string.
+ */
+static char *Util_convertBdAddr2Str(uint8_t const *pAddr)
+{
+	uint8_t     charCnt;
+	char        hex[] = "0123456789ABCDEF";
+	static char str[(BLE_GAP_ADDR_LEN << 1)+1];
+	char        *pStr = str;
+
+	//Start from end of addr
+	pAddr += BLE_GAP_ADDR_LEN;
+
+	for (charCnt = BLE_GAP_ADDR_LEN; charCnt > 0; charCnt--)
+	{
+		*pStr++ = hex[*--pAddr >> 4];
+		*pStr++ = hex[*pAddr & 0x0F];
+	}
+
+	pStr = NULL;
+
+	return str;
+}
 
 
 /**@brief Function for asserts in the SoftDevice.
@@ -242,8 +229,52 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
         case BLE_GAP_EVT_ADV_REPORT:
         {
             ble_gap_evt_adv_report_t const * p_adv_report = &p_gap_evt->params.adv_report;
-
-
+			
+			uint8_t buff[60];
+			uint8_t device_name[BLE_GAP_ADV_MAX_SIZE + 1];
+			
+			uint8_t ad_len;		// AD Length in a AD Structure
+			uint8_t ad_type;	// AD Type   in a AD Structure
+			uint8_t index = 0;
+			
+			// search for device name
+			// AD Structure include AD Length | AD Type | AD Data
+			while((index < (BLE_GAP_ADV_MAX_SIZE - 1)) && (index < p_adv_report->dlen))
+			{
+				ad_len = p_adv_report->data[index] - 1;
+				ad_type = p_adv_report->data[index + 1];
+				if((ad_type == 0x08) || (ad_type == 0x09)) 
+				{
+					memcpy(device_name, &p_adv_report->data[index + 2], ad_len);
+					device_name[ad_len] = '\0';
+					
+					memset(buff, 0, sizeof(buff));
+					sprintf((char*)buff, "%s,%d,9,%s\r\n", // MAC address, RSSI, 9, device name
+							Util_convertBdAddr2Str(p_adv_report->peer_addr.addr),
+							p_adv_report->rssi,
+							device_name);
+					
+					// uart send
+					for (uint8_t i = 0; i < strlen((char*)buff); i++)
+					{
+						do
+						{
+							err_code = app_uart_put(buff[i]);
+							if ((err_code != NRF_SUCCESS) && (err_code != NRF_ERROR_BUSY))
+							{
+								NRF_LOG_INFO("Failed uart tx message. Error 0x%x. ", err_code);
+								APP_ERROR_CHECK(err_code);
+							}
+						} while (err_code == NRF_ERROR_BUSY);
+					}
+					
+					break;
+				}
+				else
+				{
+					index += p_adv_report->data[index] + 1;
+				}
+			}
         }break; // BLE_GAP_EVT_ADV_REPORT
 
         case BLE_GAP_EVT_TIMEOUT:
