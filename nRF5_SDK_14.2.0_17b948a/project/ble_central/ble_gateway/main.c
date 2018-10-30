@@ -92,6 +92,29 @@ static char *Util_convertBdAddr2Str(uint8_t const *pAddr)
 }
 
 
+/**@brief Function for process AT command.
+ *
+ * @param[in] *pBuffer  pointer of string.
+ * @param[in] length	Length of the data.
+ */
+static void AT_cmd_handle(uint8_t *pBuffer, uint16_t length)
+{
+	ret_code_t err_code;
+	
+	// check whether is AT cmd or not	
+	if(length < 2) 
+		return;
+	if(strncmp((char*)pBuffer, "AT", 2) != 0)
+		return;
+	
+	// AT test: AT?\r\n
+	if((length == 5) && (strncmp((char*)pBuffer, "AT?\r\n", 5) == 0))
+	{
+		printf("AT:OK\r\n");
+	}
+}
+
+
 /**@brief Function for asserts in the SoftDevice.
  *
  * @details This function will be called in case of an assert in the SoftDevice.
@@ -132,7 +155,6 @@ void uart_event_handle(app_uart_evt_t * p_event)
 {
     static uint8_t data_array[BLE_NUS_MAX_DATA_LEN];
     static uint16_t index = 0;
-    uint32_t ret_val;
 
     switch (p_event->evt_type)
     {
@@ -146,14 +168,11 @@ void uart_event_handle(app_uart_evt_t * p_event)
                 NRF_LOG_DEBUG("Ready to send data over BLE NUS");
                 NRF_LOG_HEXDUMP_DEBUG(data_array, index);
 
-                do
-                {
-                    ret_val = ble_nus_c_string_send(&m_ble_nus_c, data_array, index);
-                    if ( (ret_val != NRF_ERROR_INVALID_STATE) && (ret_val != NRF_ERROR_BUSY) )
-                    {
-                        APP_ERROR_CHECK(ret_val);
-                    }
-                } while (ret_val == NRF_ERROR_BUSY);
+			#if 1	// uart printf back uart received data
+				printf("HHH:%s\r\n", data_array);
+			#endif
+				
+				AT_cmd_handle(data_array, index);
 
                 index = 0;
             }
