@@ -13,6 +13,7 @@
 #include "app_timer.h"
 #include "app_util.h"
 #include "bsp_btn_ble.h"
+#include "bsp_config.h"
 #include "ble.h"
 #include "ble_gap.h"
 #include "ble_hci.h"
@@ -23,13 +24,14 @@
 #include "ble_advdata.h"
 #include "ble_nus_c.h"
 #include "nrf_ble_gatt.h"
+#include "nrf_drv_wdt.h"
 
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 
 #define HARDWARE_NUMBER			"HW_4.3"
-#define SOFTWARE_NUMBER			"SW_1.0.3"
+#define SOFTWARE_NUMBER			"SW_1.0.4"
 #define FIRMWARE_NUMBER			"FW_14.2.0"
 
 #define APP_BLE_CONN_CFG_TAG    1                                       /**< A tag that refers to the BLE stack configuration we set with @ref sd_ble_cfg_set. Default tag is @ref BLE_CONN_CFG_TAG_DEFAULT. */
@@ -44,13 +46,17 @@
 #define SCAN_WINDOW             MSEC_TO_UNITS(50, UNIT_0_625_MS)		/**< Determines scan window in units of 0.625 millisecond. */
 #define SCAN_TIMEOUT            0x0000                                  /**< Timout when scanning. 0x0000 disables timeout. */
 
+#define WDT_FEED_INTERVALY		APP_TIMER_TICKS(800)					/**< WDT feed interval. */
 
 BLE_NUS_C_DEF(m_ble_nus_c);                                             /**< BLE NUS service client instance. */
 NRF_BLE_GATT_DEF(m_gatt);                                               /**< GATT module instance. */
 BLE_DB_DISCOVERY_DEF(m_db_disc);                                        /**< DB discovery module instance. */
 
+APP_TIMER_DEF(wdt_feed_timer_id);									/**< WDT feed delay timer instance. */
+
 static uint16_t m_ble_nus_max_data_len = BLE_GATT_ATT_MTU_DEFAULT - OPCODE_LENGTH - HANDLE_LENGTH; /**< Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
 
+nrf_drv_wdt_channel_id m_channel_id;	// wdt channel id
 
 /** @brief Parameters used when scanning. */
 static ble_gap_scan_params_t const m_scan_params =
@@ -82,8 +88,7 @@ typedef struct
 
 user_filter_t user[USER_FILTER_MAX_INDEX];
 
-
-static uint8_t filter_enable = 0;
+static uint8_t filter_enable = 0;	// user device name filter enable
 
 
 /**@brief Function for convert Bluetooth MAC address to string.
@@ -491,11 +496,31 @@ void bsp_event_handler(bsp_event_t event)
                 APP_ERROR_CHECK(err_code);
             }
             break;
-
+			
         default:
             break;
     }
 }
+
+
+/**@brief Function for feed WDT.
+ *
+ * @param[in] p_context   Unused.
+ */
+static void wdt_feed_timer_handler(void * p_context)
+{
+	nrf_drv_wdt_channel_feed(m_channel_id);
+}
+
+
+/**
+ * @brief WDT events handler.
+ */
+void wdt_event_handler(void)
+{
+    // NOTE: The max amount of time we can spend in WDT interrupt is two cycles of 32768[Hz] clock - after that, reset occurs
+}
+
 
 /**@brief Function for initializing the UART. */
 static void uart_init(void)
@@ -543,6 +568,11 @@ static void timer_init(void)
 {
     ret_code_t err_code = app_timer_init();
     APP_ERROR_CHECK(err_code);
+	
+    err_code = app_timer_create(&wdt_feed_timer_id, 
+								APP_TIMER_MODE_REPEATED, 
+								wdt_feed_timer_handler);
+    APP_ERROR_CHECK(err_code);		
 }
 
 
@@ -564,6 +594,35 @@ static void power_init(void)
 }
 
 
+/**@brief Function for initializing the wdt module. */
+void wdt_init(void)
+{
+	// Configure WDT.
+	uint32_t err_code = NRF_SUCCESS;
+	
+    nrf_drv_wdt_config_t config = NRF_DRV_WDT_DEAFULT_CONFIG;
+    err_code = nrf_drv_wdt_init(&config, wdt_event_handler);
+    APP_ERROR_CHECK(err_code);
+	
+    err_code = nrf_drv_wdt_channel_alloc(&m_channel_id);
+    APP_ERROR_CHECK(err_code);
+	
+    nrf_drv_wdt_enable();
+}
+
+
+/**@brief Function for wdt feed timers.
+ *
+ * @details Starts application wdt feed timers.
+ */
+static void wdt_feed_timers_start(void)
+{
+	ret_code_t err_code;
+
+    err_code = app_timer_start(wdt_feed_timer_id, WDT_FEED_INTERVALY, NULL);
+    APP_ERROR_CHECK(err_code);
+}
+
 
 int main(void)
 {
@@ -571,14 +630,18 @@ int main(void)
     timer_init();
     power_init();
     uart_init();
-    buttons_leds_init();
+	wdt_init();
+    buttons_leds_init();	
     ble_stack_init();
     gatt_init();
 
     // Start scanning for peripherals and initiate connection
     // with devices that advertise NUS UUID.
-    printf("BLE UART Gateway started.\r\n");
+    printf("BLE Gateway started.\r\n");
     NRF_LOG_INFO("BLE Gateway started.");
+	
+	wdt_feed_timers_start();
+	
     scan_start();
 
     for (;;)
