@@ -1,5 +1,7 @@
 /**
- * 
+ * BLE_Gateway working as Central, scans Peripheral and then analysis ADV_DATA and SCAN_RESP_DATA.
+ * When get Device Name, RSSI and MAC Address, BLE_Gateway will send this information via UART.
+ * Uart baud 115200bps, 8 data bit, 1 stop bit, none check bit, none flow control.
  */
 #include <stdio.h>
 #include <stdint.h>
