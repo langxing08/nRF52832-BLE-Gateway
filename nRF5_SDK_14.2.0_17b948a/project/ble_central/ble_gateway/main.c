@@ -67,6 +67,23 @@ static ble_gap_scan_params_t const m_scan_params =
 };
 
 
+#define USER_FILTER_MAX_INDEX	20
+#define USER_FILTER_LEN			3
+
+//user filter
+typedef struct
+{
+	uint8_t cmd_enable;
+	uint8_t filter_keywords[USER_FILTER_LEN];
+	uint8_t filter_length;
+} user_filter_t;
+
+user_filter_t user[USER_FILTER_MAX_INDEX];
+
+
+static uint8_t filter_enable = 0;
+
+
 /**@brief Function for convert Bluetooth MAC address to string.
  *
  * @param[in] *pAddr - Bluetooth MAC address.
@@ -142,6 +159,52 @@ static void AT_cmd_handle(uint8_t *pBuffer, uint16_t length)
 		APP_ERROR_CHECK(err_code);
 
 		printf("AT+MAC:%s\r\n", Util_convertBdAddr2Str(device_addr.addr));
+	}	
+	
+	// Filter enable: AT+FILTER=N\r\n, 1:enable, 0:disable
+	else if((length == 13) && (strncmp((char*)pBuffer, "AT+FILTER=", 10) == 0))
+	{
+		uint32_t filter_enable_tmp;
+		sscanf((char*)pBuffer, "AT+FILTER=%x\r\n", &filter_enable_tmp);
+		if((filter_enable_tmp == 0) || (filter_enable_tmp == 1))
+		{
+			filter_enable = filter_enable_tmp;
+			printf("AT+FILTER:OK\r\n");
+		}
+		else
+		{
+			printf("AT+FILTER:ERP\r\n");
+		}
+	}
+	
+	// User filter format rule:AT+USER=M,N,XYZ\r\n
+	else if((length >= 15) && (strncmp((char*)pBuffer, "AT+USER=", 8) == 0))
+	{
+		uint32_t user_cmd_index_tmp, user_cmd_enable_tmp;
+		
+		sscanf((char*)pBuffer, "AT+USER=%x,%x,", 
+				&user_cmd_index_tmp, 	// user cmd index range
+				&user_cmd_enable_tmp);	// user cmd enable:0:disable, 1:enable
+		if((user_cmd_index_tmp < USER_FILTER_MAX_INDEX)
+			&&((user_cmd_enable_tmp == 0) ||(user_cmd_enable_tmp == 1)))
+		{
+			user[user_cmd_index_tmp].cmd_enable = user_cmd_enable_tmp;
+			
+			char* ans;
+			ans = strrchr((char*)pBuffer, ',');
+			ans++;	// atfter ','
+			
+			memcpy(user[user_cmd_index_tmp].filter_keywords, ans, USER_FILTER_LEN);
+			
+			char *p = strstr(ans, "\r\n");
+			user[user_cmd_index_tmp].filter_length = p - ans; 
+						
+			printf("AT+USER:OK\r\n");
+		}
+		else
+		{
+			printf("AT+USER:ERP\r\n");
+		}
 	}	
 }
 
@@ -266,6 +329,9 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 			uint8_t buff[60];
 			uint8_t device_name[BLE_GAP_ADV_MAX_SIZE + 1];
 			
+			uint8_t filter_flag = 0;	// find device name when filter enable
+			uint8_t no_filter_flag = 0;	// find device name when filter disable
+			
 			uint8_t ad_len;		// AD Length in a AD Structure
 			uint8_t ad_type;	// AD Type   in a AD Structure
 			uint8_t index = 0;
@@ -281,25 +347,46 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 					memcpy(device_name, &p_adv_report->data[index + 2], ad_len);
 					device_name[ad_len] = '\0';
 					
-					memset(buff, 0, sizeof(buff));
-					sprintf((char*)buff, "%s,%d,9,%s\r\n", // MAC address, RSSI, 9, device name
-							Util_convertBdAddr2Str(p_adv_report->peer_addr.addr),
-							p_adv_report->rssi,
-							device_name);
-					
-					// uart send
-					for (uint8_t i = 0; i < strlen((char*)buff); i++)
+					if(filter_enable)
 					{
-						do
+						// device name filter(first USER_FILTER_LEN Bytes)
+						for(uint8_t cnt=0; cnt < USER_FILTER_MAX_INDEX; cnt++)
 						{
-							err_code = app_uart_put(buff[i]);
-							if ((err_code != NRF_SUCCESS) && (err_code != NRF_ERROR_BUSY))
+							if(user[cnt].cmd_enable 
+								&& !memcmp(device_name, user[cnt].filter_keywords, user[cnt].filter_length))
 							{
-								NRF_LOG_INFO("Failed uart tx message. Error 0x%x. ", err_code);
-								APP_ERROR_CHECK(err_code);
+								filter_flag = 1;
+								break;
 							}
-						} while (err_code == NRF_ERROR_BUSY);
+						}
 					}
+					else
+					{
+						no_filter_flag = 1;
+					}//if(filter_enable)
+					
+					if(filter_flag || no_filter_flag)
+					{
+						memset(buff, 0, sizeof(buff));
+						sprintf((char*)buff, "%s,%d,9,%s\r\n", // MAC address, RSSI, 9, device name
+								Util_convertBdAddr2Str(p_adv_report->peer_addr.addr),
+								p_adv_report->rssi,
+								device_name);
+						
+						// uart send
+						for (uint8_t i = 0; i < strlen((char*)buff); i++)
+						{
+							do
+							{
+								err_code = app_uart_put(buff[i]);
+								if ((err_code != NRF_SUCCESS) && (err_code != NRF_ERROR_BUSY))
+								{
+									NRF_LOG_INFO("Failed uart tx message. Error 0x%x. ", err_code);
+									APP_ERROR_CHECK(err_code);
+								}
+							} while (err_code == NRF_ERROR_BUSY);
+						}
+					}//end if(filter_flag || no_filter_flag)
 					
 					break;
 				}
