@@ -2,6 +2,14 @@
  * BLE_Gateway working as Central, scans Peripheral and then analysis ADV_DATA and SCAN_RESP_DATA.
  * When get Device Name, RSSI and MAC Address, BLE_Gateway will send this information via UART.
  * Uart baud 115200bps, 8 data bit, 1 stop bit, none check bit, none flow control.
+ *
+ * version	V1.0.0  -- 	Create project
+ *			V1.0.1  -- 	Realize the basic BLE_Gateway function
+ *			V1.0.2  -- 	Add AT Command
+ *			V1.0.3  -- 	Add user keywords filter AT command
+ *			V1.0.4  -- 	Add WDT
+ *			V1.0.5  -- 	Add RTT LOG conditional-compilation; 
+ *						Fix after received disable user keywords AT command, disable all user.cmd_enable
  */
 #include <stdio.h>
 #include <stdint.h>
@@ -31,7 +39,7 @@
 #include "nrf_log_default_backends.h"
 
 #define HARDWARE_NUMBER			"HW_4.3"
-#define SOFTWARE_NUMBER			"SW_1.0.4"
+#define SOFTWARE_NUMBER			"SW_1.0.5"
 #define FIRMWARE_NUMBER			"FW_14.2.0"
 
 #define APP_BLE_CONN_CFG_TAG    1                                       /**< A tag that refers to the BLE stack configuration we set with @ref sd_ble_cfg_set. Default tag is @ref BLE_CONN_CFG_TAG_DEFAULT. */
@@ -175,6 +183,15 @@ static void AT_cmd_handle(uint8_t *pBuffer, uint16_t length)
 		sscanf((char*)pBuffer, "AT+FILTER=%x\r\n", &filter_enable_tmp);
 		if((filter_enable_tmp == 0) || (filter_enable_tmp == 1))
 		{
+			if(filter_enable_tmp == 0)
+			{
+				// disable all filter keywords 
+				for(uint8_t i=0; i < USER_FILTER_MAX_INDEX; i++)
+				{
+					user[i].cmd_enable = 0;
+				}
+			}
+			
 			filter_enable = filter_enable_tmp;
 			printf("AT+FILTER:OK\r\n");
 		}
