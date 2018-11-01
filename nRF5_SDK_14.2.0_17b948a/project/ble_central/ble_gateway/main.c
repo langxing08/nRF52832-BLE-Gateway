@@ -266,8 +266,10 @@ void uart_event_handle(app_uart_evt_t * p_event)
 
             if ((data_array[index - 1] == '\n') || (index >= (m_ble_nus_max_data_len)))
             {
+			#if NRF_LOG_ENABLED	
                 NRF_LOG_DEBUG("Ready to send data over BLE NUS");
                 NRF_LOG_HEXDUMP_DEBUG(data_array, index);
+			#endif	
 
 			#if 1	// uart printf back uart received data
 				printf("HHH:%s\r\n", data_array);
@@ -388,7 +390,9 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 								err_code = app_uart_put(buff[i]);
 								if ((err_code != NRF_SUCCESS) && (err_code != NRF_ERROR_BUSY))
 								{
+								#if NRF_LOG_ENABLED
 									NRF_LOG_INFO("Failed uart tx message. Error 0x%x. ", err_code);
+								#endif	
 									APP_ERROR_CHECK(err_code);
 								}
 							} while (err_code == NRF_ERROR_BUSY);
@@ -407,12 +411,16 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
         case BLE_GAP_EVT_TIMEOUT:
             if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_SCAN)
             {
+			#if NRF_LOG_ENABLED	
                 NRF_LOG_INFO("Scan timed out.");
+			#endif	
                 scan_start();
             }
             else if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_CONN)
             {
+			#if NRF_LOG_ENABLED	
                 NRF_LOG_INFO("Connection Request timed out.");
+			#endif	
             }
             break;
 
@@ -453,10 +461,14 @@ void gatt_evt_handler(nrf_ble_gatt_t * p_gatt, nrf_ble_gatt_evt_t const * p_evt)
 {
     if (p_evt->evt_id == NRF_BLE_GATT_EVT_ATT_MTU_UPDATED)
     {
+	#if NRF_LOG_ENABLED	
         NRF_LOG_INFO("ATT MTU exchange completed.");
-
+	#endif
+		
         m_ble_nus_max_data_len = p_evt->params.att_mtu_effective - OPCODE_LENGTH - HANDLE_LENGTH;
+	#if NRF_LOG_ENABLED	
         NRF_LOG_INFO("Ble NUS max data length set to 0x%X(%d)", m_ble_nus_max_data_len, m_ble_nus_max_data_len);
+	#endif	
     }
 }
 
@@ -577,14 +589,16 @@ static void timer_init(void)
 
 
 /**@brief Function for initializing the nrf log module. */
+#if NRF_LOG_ENABLED
 static void log_init(void)
 {
+	
     ret_code_t err_code = NRF_LOG_INIT(NULL);
     APP_ERROR_CHECK(err_code);
 
     NRF_LOG_DEFAULT_BACKENDS_INIT();
 }
-
+#endif
 
 /**@brief Function for initializing the Power manager. */
 static void power_init(void)
@@ -626,7 +640,9 @@ static void wdt_feed_timers_start(void)
 
 int main(void)
 {
+#if NRF_LOG_ENABLED	
     log_init();
+#endif	
     timer_init();
     power_init();
     uart_init();
@@ -638,7 +654,10 @@ int main(void)
     // Start scanning for peripherals and initiate connection
     // with devices that advertise NUS UUID.
     printf("BLE Gateway started.\r\n");
+	
+#if NRF_LOG_ENABLED	
     NRF_LOG_INFO("BLE Gateway started.");
+#endif	
 	
 	wdt_feed_timers_start();
 	
@@ -646,9 +665,13 @@ int main(void)
 
     for (;;)
     {
+	#if NRF_LOG_ENABLED	
         if (NRF_LOG_PROCESS() == false)
         {
             nrf_pwr_mgmt_run();
         }
+	#else
+		nrf_pwr_mgmt_run();
+	#endif		
     }
 }

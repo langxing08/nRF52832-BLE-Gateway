@@ -1129,6 +1129,11 @@
                 </FileArmAds>
               </FileOption>
             </File>
+            <File>
+              <FileName>nrf_drv_wdt.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\..\..\..\components\drivers_nrf\wdt\nrf_drv_wdt.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -3930,6 +3935,11 @@
                   </Cads>
                 </FileArmAds>
               </FileOption>
+            </File>
+            <File>
+              <FileName>nrf_drv_wdt.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\..\..\..\components\drivers_nrf\wdt\nrf_drv_wdt.c</FilePath>
             </File>
           </Files>
         </Group>
